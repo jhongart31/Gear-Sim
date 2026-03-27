@@ -80,7 +80,7 @@ def main():
     # --- UI Inputs ---
     with st.expander("Simulation Settings", expanded=True):
         num_simulations = st.number_input("How many simulations do you want to run?", min_value=1, value=1)
-        mode = st.radio("Do you want to input number of summons?", ["Yes", "No"])
+        mode = st.radio("Which mode would you like to use", ["Run certain amount of summons", "Pick target equipment to summon"])
 
         if mode == "Yes":
             num_summons = st.number_input("Number of summons per simulation?", min_value=1, value=10)
