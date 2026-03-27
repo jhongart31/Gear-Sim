@@ -109,7 +109,7 @@ def main():
                 gear_slots + ["Any", "All"]
             )
 
-            # ✅ "Any" moved to bottom
+            # "Any" moved to bottom
             target_level_name = st.selectbox(
                 "Target Level",
                 list(level_names.values()) + ["Any"]
@@ -217,7 +217,7 @@ def main():
         avg_shards = total_shards / num_simulations
 
         # --- Summary FIRST ---
-        st.markdown("## 📊 Simulation Results")
+        st.markdown("## Simulation Results")
         col1, col2 = st.columns(2)
 
         with col1:
