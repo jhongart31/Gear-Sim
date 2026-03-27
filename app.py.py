@@ -26,6 +26,15 @@ def main():
     }
     name_to_level = {v.lower(): k for k, v in level_names.items()}
 
+    # --- Shard values ---
+    def get_shards(name, level):
+        if name in normal_gear:
+            return 20 * (2 ** (level - 1))
+        else:
+            if level < 5:
+                return 0
+            return 1280 * (2 ** (level - 5))
+
     def merge_inventory(inv):
         merged = True
         while merged:
@@ -97,20 +106,29 @@ def main():
 
     # --- Output Filter Options ---
     with st.expander("Output Filter Options", expanded=True):
-        st.write("Select which gear to display in the results table:")
+        st.write("Select which gear to display:")
         gear_filter = []
         for gear_name in all_gear:
             if st.checkbox(gear_name, value=True):
                 gear_filter.append(gear_name)
 
+    # --- Dismantle Options ---
+    with st.expander("Dismantle Options", expanded=False):
+        st.write("Select gear to dismantle into Equipment Shards:")
+        dismantle_filter = []
+        for gear_name in all_gear:
+            if st.checkbox(f"Dismantle {gear_name}", value=False):
+                dismantle_filter.append(gear_name)
+
     # --- Run Simulation ---
     if st.button("▶ Run Simulation"):
 
-        st.write("Simulation running... This may take a few seconds for large numbers of simulations.")
+        st.write("Simulation running...")
         progress_bar = st.progress(0)
 
         cumulative_inventory = defaultdict(int)
         total_summons_overall = 0
+        total_shards = 0
 
         for sim in range(num_simulations):
             inventory = defaultdict(int)
@@ -119,8 +137,6 @@ def main():
             if mode == "Run certain amount of summons":
                 for i in range(num_summons):
                     total_summons = summon(inventory, total_summons)
-                    if num_summons >= 20 and i % max(1, num_summons // 20) == 0:
-                        progress_bar.progress((sim + i/num_summons)/num_simulations)
                 inventory = merge_inventory(inventory)
             else:
                 while True:
@@ -128,22 +144,31 @@ def main():
                     inventory = merge_inventory(inventory)
 
                     if target_slot == "Any":
-                        total = sum(
-                            inventory.get((target_name, slot, target_level), 0) for slot in gear_slots
-                        )
+                        total = sum(inventory.get((target_name, s, target_level), 0) for s in gear_slots)
                         if total >= target_quantity:
                             break
                     elif target_slot == "All":
-                        totals = [inventory.get((target_name, slot, target_level), 0) for slot in gear_slots]
-                        if all(t >= target_quantity for t in totals):
+                        if all(inventory.get((target_name, s, target_level), 0) >= target_quantity for s in gear_slots):
                             break
                     else:
-                        total = inventory.get((target_name, target_slot, target_level), 0)
-                        if total >= target_quantity:
+                        if inventory.get((target_name, target_slot, target_level), 0) >= target_quantity:
                             break
 
-            for key, value in inventory.items():
+            # --- Dismantle Logic ---
+            new_inventory = defaultdict(int)
+            sim_shards = 0
+
+            for (name, slot, level), count in inventory.items():
+                if name in dismantle_filter:
+                    sim_shards += get_shards(name, level) * count
+                else:
+                    new_inventory[(name, slot, level)] += count
+
+            total_shards += sim_shards
+
+            for key, value in new_inventory.items():
                 cumulative_inventory[key] += value
+
             total_summons_overall += total_summons
             progress_bar.progress((sim + 1)/num_simulations)
 
@@ -153,15 +178,16 @@ def main():
             average_inventory[key] = value / num_simulations
 
         average_summons = total_summons_overall / num_simulations
+        average_shards = total_shards / num_simulations
 
-        # --- CLEAN PIVOT TABLE ---
+        # --- Pivot Table ---
         rows = []
         for (name, slot, level), count in average_inventory.items():
             if name in gear_filter:
                 rows.append({
                     "Gear": name,
                     "Slot": slot,
-                    "Level": level_names.get(level, f"Level {level}"),
+                    "Level": level_names[level],
                     "Count": count
                 })
 
@@ -176,23 +202,16 @@ def main():
                 fill_value=0
             )
 
-            ordered_levels = [
-                "Common", "Excellent", "Elite", "Epic", "Legendary",
-                "Mythic", "Mythic*", "Mythic**", "Mythic***"
-            ]
+            ordered_levels = list(level_names.values())
             pivot_df = pivot_df.reindex(columns=ordered_levels, fill_value=0)
 
-            if num_simulations > 1:
-                pivot_df = pivot_df.round(2)
-            else:
-                pivot_df = pivot_df.astype(int)
-
+            pivot_df = pivot_df.round(2) if num_simulations > 1 else pivot_df.astype(int)
             pivot_df = pivot_df.reset_index()
 
-            st.write(f"### Average results over {num_simulations} simulation(s) (avg summons per sim: {average_summons:.2f}):")
+            st.write(f"### Results (avg summons: {average_summons:.2f})")
             st.dataframe(pivot_df, use_container_width=True)
-        else:
-            st.write("No data to display.")
+
+        st.write(f"###  Average Equipment Shards: {average_shards:,.2f}")
 
 if __name__ == "__main__":
     main()
