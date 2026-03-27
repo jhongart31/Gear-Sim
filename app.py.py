@@ -232,6 +232,17 @@ def main():
 
         df = pd.DataFrame(rows)
 
+        # --- Show summary FIRST ---
+        st.markdown("## Simulation Results")
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.metric("Avg Summons", f"{avg_summons:.2f}")
+
+        with col2:
+            st.metric("Equipment Shards", f"{avg_shards:,.2f}")
+
+        # --- Then show table ---
         if not df.empty:
 
             pivot = df.pivot_table(
@@ -255,9 +266,6 @@ def main():
             pivot = pivot.reset_index()
 
             st.dataframe(pivot, use_container_width=True)
-
-        st.write(f"### Avg summons: {avg_summons:.2f}")
-        st.write(f"### 💠 Avg Equipment Shards: {avg_shards:,.2f}")
 
 
 if __name__ == "__main__":
