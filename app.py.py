@@ -7,7 +7,7 @@ def main():
     st.set_page_config(page_title="Gear Summoner Simulator", layout="wide")
     st.title("Gear Summoner Simulator")
 
-    # --- Gear setup ---
+    # Equipment
     normal_gear = ["Assassin", "Crusader", "Farmer", "Hunter", "Paladin"]
     special_gear = ["Viking", "King", "Lord"]
     all_gear = normal_gear + special_gear
@@ -21,7 +21,7 @@ def main():
 
     name_to_level = {v.lower(): k for k, v in level_names.items()}
 
-    # --- Shards ---
+    # Eq Shard calc
     def get_shards(name, level):
         if name in normal_gear:
             return 20 * (2 ** (level - 1))
@@ -30,7 +30,7 @@ def main():
                 return 0
             return 1280 * (2 ** (level - 5))
 
-    # --- Merge ---
+    #lvl up counter
     def merge_inventory(inv):
         merged = True
         while merged:
@@ -55,7 +55,6 @@ def main():
 
         return inv
 
-    # --- Summon ---
     def summon(inventory, total_summons):
         total_summons += 1
 
@@ -85,7 +84,7 @@ def main():
 
         return total_summons
 
-    # ================= UI =================
+    # UI
 
     with st.expander("Simulation Settings", expanded=True):
         num_simulations = st.number_input("How many simulations?", min_value=1, value=1)
@@ -109,7 +108,6 @@ def main():
                 gear_slots + ["Any", "All"]
             )
 
-            # "Any" moved to bottom
             target_level_name = st.selectbox(
                 "Target Level",
                 list(level_names.values()) + ["Any"]
@@ -126,15 +124,13 @@ def main():
                 value=1
             )
 
-    # --- Output Filter ---
+    #Output
     with st.expander("Output Filter Options", expanded=True):
         gear_filter = [g for g in all_gear if st.checkbox(g, value=True)]
 
-    # --- Dismantle ---
     with st.expander("Dismantle Options"):
         dismantle_filter = [g for g in all_gear if st.checkbox(f"Dismantle {g}", value=False)]
 
-    # --- Matching ---
     def matches_target(name):
         if target_name == "Any":
             return True
@@ -147,8 +143,6 @@ def main():
         if target_level is None:
             return True
         return level >= target_level
-
-    # ================= RUN =================
 
     if st.button("▶ Run Simulation"):
 
@@ -196,7 +190,6 @@ def main():
                         if count_matching(target_slot) >= target_quantity:
                             break
 
-            # --- Dismantle ---
             new_inventory = defaultdict(int)
 
             for (name, slot, level), count in inventory.items():
@@ -211,12 +204,10 @@ def main():
             total_summons_overall += total_summons
             progress_bar.progress((sim + 1) / num_simulations)
 
-        # --- Averages ---
         avg_inventory = {k: v / num_simulations for k, v in cumulative_inventory.items()}
         avg_summons = total_summons_overall / num_simulations
         avg_shards = total_shards / num_simulations
 
-        # --- Summary FIRST ---
         st.markdown("## Simulation Results")
         col1, col2 = st.columns(2)
 
@@ -226,7 +217,6 @@ def main():
         with col2:
             st.metric("Equipment Shards", f"{avg_shards:,.2f}")
 
-        # --- Table ---
         rows = [
             {"Gear": n, "Slot": s, "Level": level_names[l], "Count": c}
             for (n, s, l), c in avg_inventory.items()
