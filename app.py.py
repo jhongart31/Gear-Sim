@@ -21,7 +21,7 @@ def main():
 
     name_to_level = {v.lower(): k for k, v in level_names.items()}
 
-    # --- Shard Calculation ---
+    # --- Shards ---
     def get_shards(name, level):
         if name in normal_gear:
             return 20 * (2 ** (level - 1))
@@ -30,7 +30,7 @@ def main():
                 return 0
             return 1280 * (2 ** (level - 5))
 
-    # --- Merge System ---
+    # --- Merge ---
     def merge_inventory(inv):
         merged = True
         while merged:
@@ -55,7 +55,7 @@ def main():
 
         return inv
 
-    # --- Summon Logic ---
+    # --- Summon ---
     def summon(inventory, total_summons):
         total_summons += 1
 
@@ -109,12 +109,16 @@ def main():
                 gear_slots + ["Any", "All"]
             )
 
+            # ✅ "Any" moved to bottom
             target_level_name = st.selectbox(
                 "Target Level",
-                list(level_names.values())
+                list(level_names.values()) + ["Any"]
             )
 
-            target_level = name_to_level[target_level_name.lower()]
+            if target_level_name != "Any":
+                target_level = name_to_level[target_level_name.lower()]
+            else:
+                target_level = None
 
             target_quantity = st.number_input(
                 "Quantity needed",
@@ -124,19 +128,13 @@ def main():
 
     # --- Output Filter ---
     with st.expander("Output Filter Options", expanded=True):
-        gear_filter = []
-        for g in all_gear:
-            if st.checkbox(g, value=True):
-                gear_filter.append(g)
+        gear_filter = [g for g in all_gear if st.checkbox(g, value=True)]
 
-    # --- Dismantle Options ---
+    # --- Dismantle ---
     with st.expander("Dismantle Options"):
-        dismantle_filter = []
-        for g in all_gear:
-            if st.checkbox(f"Dismantle {g}", value=False):
-                dismantle_filter.append(g)
+        dismantle_filter = [g for g in all_gear if st.checkbox(f"Dismantle {g}", value=False)]
 
-    # --- Target Matching ---
+    # --- Matching ---
     def matches_target(name):
         if target_name == "Any":
             return True
@@ -144,6 +142,11 @@ def main():
             return name in special_gear
         else:
             return name == target_name
+
+    def level_matches(level):
+        if target_level is None:
+            return True
+        return level >= target_level
 
     # ================= RUN =================
 
@@ -177,8 +180,8 @@ def main():
                         return sum(
                             v for (n, s, l), v in inventory.items()
                             if matches_target(n)
+                            and level_matches(l)
                             and (slot_check is None or s == slot_check)
-                            and l >= target_level
                         )
 
                     if target_slot == "Any":
@@ -193,7 +196,7 @@ def main():
                         if count_matching(target_slot) >= target_quantity:
                             break
 
-            # --- Dismantle Step ---
+            # --- Dismantle ---
             new_inventory = defaultdict(int)
 
             for (name, slot, level), count in inventory.items():
@@ -206,34 +209,15 @@ def main():
                 cumulative_inventory[key] += value
 
             total_summons_overall += total_summons
-
             progress_bar.progress((sim + 1) / num_simulations)
 
         # --- Averages ---
-        avg_inventory = {
-            k: v / num_simulations
-            for k, v in cumulative_inventory.items()
-        }
-
+        avg_inventory = {k: v / num_simulations for k, v in cumulative_inventory.items()}
         avg_summons = total_summons_overall / num_simulations
         avg_shards = total_shards / num_simulations
 
-        # --- Table Output ---
-        rows = []
-
-        for (name, slot, level), count in avg_inventory.items():
-            if name in gear_filter:
-                rows.append({
-                    "Gear": name,
-                    "Slot": slot,
-                    "Level": level_names[level],
-                    "Count": count
-                })
-
-        df = pd.DataFrame(rows)
-
-        # --- Show summary FIRST ---
-        st.markdown("## Simulation Results")
+        # --- Summary FIRST ---
+        st.markdown("## 📊 Simulation Results")
         col1, col2 = st.columns(2)
 
         with col1:
@@ -242,9 +226,16 @@ def main():
         with col2:
             st.metric("Equipment Shards", f"{avg_shards:,.2f}")
 
-        # --- Then show table ---
-        if not df.empty:
+        # --- Table ---
+        rows = [
+            {"Gear": n, "Slot": s, "Level": level_names[l], "Count": c}
+            for (n, s, l), c in avg_inventory.items()
+            if n in gear_filter
+        ]
 
+        df = pd.DataFrame(rows)
+
+        if not df.empty:
             pivot = df.pivot_table(
                 index=["Gear", "Slot"],
                 columns="Level",
@@ -253,10 +244,7 @@ def main():
                 fill_value=0
             )
 
-            pivot = pivot.reindex(
-                columns=list(level_names.values()),
-                fill_value=0
-            )
+            pivot = pivot.reindex(columns=list(level_names.values()), fill_value=0)
 
             if num_simulations > 1:
                 pivot = pivot.round(2)
